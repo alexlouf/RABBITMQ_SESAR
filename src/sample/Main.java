@@ -9,7 +9,11 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DeliverCallback;
+import okhttp3.*;
 import org.slf4j.*;
+
+import java.io.IOException;
+import java.util.Map;
 
 public class Main extends Application {
 
@@ -20,13 +24,14 @@ public class Main extends Application {
         primaryStage.setScene(new Scene(root, 300, 275));
         primaryStage.show();
 
+
         String QUEUE_NAME = "v1.airbus.woc.atcvolumes";
         ConnectionFactory factory = new ConnectionFactory();
         factory.useSslProtocol();
         factory.setHost("api.dev.pansa.pl");
         factory.setPort(5671);
         factory.setVirtualHost("sesar-sol40");
-        factory.setPassword("ACCESS_TOKEN");
+        factory.setPassword(getToken(System.getenv("OFFLINE_TOKEN")));
         Connection connection = factory.newConnection();
         Channel channel = connection.createChannel();
 
@@ -43,5 +48,22 @@ public class Main extends Application {
 
     public static void main(String[] args) {
         launch(args);
+    }
+
+    private String getToken(String offlineToken) throws IOException {
+        String token = "";
+
+        OkHttpClient client = new OkHttpClient().newBuilder()
+                .build();
+        MediaType mediaType = MediaType.parse("application/x-www-form-urlencoded");
+        RequestBody body = RequestBody.create(mediaType, "client_id=token-provider&grant_type=refresh_token&refresh_token="+offlineToken);
+        Request request = new Request.Builder()
+                .url("https://sso.dev.pansa.pl/auth/realms/api/protocol/openid-connect/token")
+                .method("POST", body)
+                .addHeader("Content-Type", "application/x-www-form-urlencoded")
+                .build();
+        Response response = client.newCall(request).execute();
+        System.out.println(response.body().string());
+        return token;
     }
 }
